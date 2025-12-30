@@ -26,16 +26,6 @@ HOMEWORK_VERDICTS = {
 }
 
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler("bot.log"),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-
 def check_tokens():
     """Проверка доступности переменных окружения."""
     tokens = {
@@ -49,8 +39,9 @@ def check_tokens():
             missing_tokens.append(key)
 
     if missing_tokens:
-        logging.critical(f"Отсутствует токен: {','.join(missing_tokens)}")
-        sys.exit(1)
+        logging.critical(f"Отсутствует токен: {', '.join(missing_tokens)}")
+        return False
+    return True
 
 
 def send_message(bot, message):
@@ -58,51 +49,42 @@ def send_message(bot, message):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.debug(f'Бот отправил сообщение: {message}')
-    except Exception as error:
+    except (requests.RequestException, Exception) as error:
         logging.error(f'Сбой при отправке сообщения в Telegram: {error}')
 
 
 def get_api_answer(timestamp):
     """Делает запрос к эндпоинту API-сервиса."""
     payload = {'from_date': timestamp}
-
     try:
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params=payload)
 
-        if response.status_code != HTTPStatus.OK:
-            error_msg = (
-                f'Эндпоинт {ENDPOINT} недоступен.'
-                f'Код ответа: {response.status_code}'
-            )
-            raise requests.exceptions.HTTPError(error_msg)
-
-        return response.json()
-
     except requests.RequestException as error:
-        error_msg = f'Ошибка при запросе к основному API: {error}'
-        logging.error(error_msg)
-        raise ConnectionError(error_msg)
+        raise ConnectionError(f'Ошибка при запросе к основному API: {error}')
+
+    if response.status_code != HTTPStatus.OK:
+        error_msg = (
+            f'Эндпоинт {ENDPOINT} недоступен.'
+            f'Код ответа: {response.status_code}'
+        )
+        raise ValueError(error_msg)
+
+    return response.json()
 
 
 def check_response(response):
     """Проверяет ответ API на соответствие документации."""
-    try:
-        if not isinstance(response, dict):
-            raise TypeError(
-                f"Ожидался словарь, но пришел {type(response).__name__}"
-            )
+    if not isinstance(response, dict):
+        raise TypeError(
+            f"Ожидался словарь, но пришел {type(response).__name__}"
+        )
 
-        if 'homeworks' not in response:
-            raise KeyError("В ответе API отсутствует ключ 'homeworks'")
+    if 'homeworks' not in response:
+        raise KeyError("В ответе API отсутствует ключ 'homeworks'")
 
-        if not isinstance(response.get('homeworks'), list):
-            raise TypeError("Под ключом 'homeworks' ожидался список")
-
-    except (TypeError, KeyError) as error:
-        logging.error(f"Ошибка при проверке ответа API: {error}")
-
-        raise error
+    if not isinstance(response.get('homeworks'), list):
+        raise TypeError("Под ключом 'homeworks' ожидался список")
     return True
 
 
@@ -136,7 +118,8 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if not check_tokens():
+        sys.exit(1)
 
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
@@ -152,22 +135,31 @@ def main():
             if homeworks:
                 message = parse_status(homeworks[0])
                 send_message(bot, message)
+                timestamp = response.get('current_date', timestamp)
             else:
                 logging.debug('Новых статусов в ответе нет')
-
-            timestamp = response.get('current_date', timestamp)
+                timestamp = response.get('current_date', timestamp)
             last_error = ''
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
-            if str(error) != last_error:
+            error_text = str(error)
+            if error_text != last_error:
                 send_message(bot, message)
-                last_error = str(error)
+                last_error = error_text
 
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+        handlers=[
+            logging.FileHandler("bot.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
     main()
