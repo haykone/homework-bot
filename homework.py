@@ -39,7 +39,7 @@ def check_tokens():
             missing_tokens.append(key)
 
     if missing_tokens:
-        logging.critical(f"Отсутствует токен: {', '.join(missing_tokens)}")
+        logging.critical(f'Отсутствует токен: {', '.join(missing_tokens)}')
         return False
     return True
 
@@ -49,6 +49,7 @@ def send_message(bot, message):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.debug(f'Бот отправил сообщение: {message}')
+        return True
     except (requests.RequestException, Exception) as error:
         logging.error(f'Сбой при отправке сообщения в Telegram: {error}')
         return False
@@ -64,11 +65,8 @@ def get_api_answer(timestamp):
         raise ConnectionError(f'Ошибка при запросе к основному API: {error}')
 
     if response.status_code != HTTPStatus.OK:
-        error_msg = (
-            f'Эндпоинт {ENDPOINT} недоступен.'
-            f'Код ответа: {response.status_code}'
-        )
-        raise RuntimeError(error_msg)
+        raise RuntimeError(f'Эндпоинт {ENDPOINT} недоступен.'
+                           f'Код ответа: {response.status_code}')
 
     return response.json()
 
@@ -81,36 +79,29 @@ def check_response(response):
         )
 
     if 'homeworks' not in response:
-        raise KeyError("В ответе API отсутствует ключ 'homeworks'")
+        raise KeyError('В ответе API отсутствует ключ "homeworks"')
 
     if not isinstance(response.get('homeworks'), list):
-        raise TypeError("Под ключом 'homeworks' ожидался список")
+        raise TypeError('Под ключом "homeworks" ожидался список')
 
 
 def parse_status(homework):
     """Извлекает статус работы и возвращает строку с вердиктом."""
     if 'homework_name' not in homework:
-        error_msg = 'В ответе API отсутствует ключ "homework_name"'
-        raise KeyError(error_msg)
+        raise KeyError('В ответе API отсутствует ключ "homework_name"')
 
     homework_name = homework.get('homework_name')
 
     if 'status' not in homework:
-        error_msg = (
-            f'В ответе API для работы "{homework_name}" '
-            'отсутствует статус')
-        logging.error(error_msg)
-        raise KeyError(error_msg)
+        raise KeyError(
+            'В ответе API для работы "{homework_name}" отсутствует статус')
 
     status = homework.get('status')
 
     if status not in HOMEWORK_VERDICTS:
-        error_msg = f'Неизвестный статус работы: {status}'
-        logging.error(error_msg)
-        raise ValueError(error_msg)
+        raise ValueError('Неизвестный статус работы: {status}')
 
     verdict = HOMEWORK_VERDICTS[status]
-
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -142,9 +133,8 @@ def main():
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
             error_text = str(error)
-            if error_text != last_error:
-                if send_message(bot, message):
-                    last_error = error_text
+            if error_text != last_error and send_message(bot, message):
+                last_error = error_text
 
         finally:
             time.sleep(RETRY_PERIOD)
@@ -155,7 +145,7 @@ if __name__ == '__main__':
         format='%(asctime)s - %(levelname)s - %(message)s',
         level=logging.INFO,
         handlers=[
-            logging.FileHandler("bot.log"),
+            logging.FileHandler('bot.log'),
             logging.StreamHandler(sys.stdout)
         ]
     )
