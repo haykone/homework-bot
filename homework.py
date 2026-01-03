@@ -127,7 +127,6 @@ def main():
                     timestamp = response.get('current_date', timestamp)
             else:
                 logging.debug('Новых статусов в ответе нет')
-                last_error = ''
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
