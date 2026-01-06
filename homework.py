@@ -119,7 +119,7 @@ def main():
             response = get_api_answer(timestamp)
             check_response(response)
             last_error = ''
-            
+
             homeworks = response.get('homeworks')
             if homeworks:
                 message = parse_status(homeworks[0])
