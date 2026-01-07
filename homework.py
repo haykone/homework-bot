@@ -94,12 +94,12 @@ def parse_status(homework):
 
     if 'status' not in homework:
         raise KeyError(
-            'В ответе API для работы "{homework_name}" отсутствует статус')
+            f'В ответе API для работы "{homework_name}" отсутствует статус')
 
     status = homework.get('status')
 
     if status not in HOMEWORK_VERDICTS:
-        raise ValueError('Неизвестный статус работы: {status}')
+        raise ValueError(f'Неизвестный статус работы: {status}')
 
     verdict = HOMEWORK_VERDICTS[status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -118,15 +118,16 @@ def main():
         try:
             response = get_api_answer(timestamp)
             check_response(response)
-            last_error = ''
 
             homeworks = response.get('homeworks')
             if homeworks:
                 message = parse_status(homeworks[0])
                 if send_message(bot, message):
                     timestamp = response.get('current_date', timestamp)
+                    last_error = ''
             else:
                 logging.debug('Новых статусов в ответе нет')
+                last_error = ''
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
